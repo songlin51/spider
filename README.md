@@ -3,3 +3,7 @@
 
 #设计初衷
     为了给fulikuai.com提供资讯文章,做成资讯的service,根据api来请求文章
+
+#php框架:Thinkphp5
+#多进程框架:Swoole
+
