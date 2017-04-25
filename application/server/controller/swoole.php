@@ -15,43 +15,44 @@ class swoole{
     }
 
     public function index(){
-        $this->serv = new \swoole_server("127.0.0.1", 9501, SWOOLE_BASE, SWOOLE_SOCK_TCP);
+        $this->serv = new \swoole_server("127.0.0.1", 9501);
         $this->conf = Config::get('swoole_set');
         $this->serv->set($this->conf);
-        $this->serv->on("OnStart",'on_start');           //swoole启动主进程主线程回调
-        $this->serv->on("OnShutdown",'on_shutdown');     //服务关闭回调
-        $this->serv->on("OnConnect",'on_connect');       //新连接进入回调
-        $this->serv->on("OnReceive",'on_receive');       //接收数据回调
-        $this->serv->on("OnClose",'on_close');           //客户端关闭回调
-        $this->serv->on("OnTask",'on_task');             //task进程回调
-        $this->serv->on("OnFinish",'on_finish');         //进程投递的任务在task_worker中完成时回调 exit("服务已经在运行!");
+        $this->serv->on("Start",array($this,'on_start'));           //swoole启动主进程主线程回调
+        $this->serv->on("Shutdown",array($this,'on_shutdown'));     //服务关闭回调
+        $this->serv->on("Connect",array($this,'on_connect'));       //新连接进入回调
+        $this->serv->on("Receive",array($this,'on_receive'));       //接收数据回调
+        $this->serv->on("Close",array($this,'on_close'));           //客户端关闭回调
+        $this->serv->on("Task",array($this,'on_task'));             //task进程回调
+        $this->serv->on("Finish",array($this,'on_finish'));         //进程投递的任务在task_worker中完成时回调 exit("服务已经在运行!");
+        $this->serv->start();
     }
 
-    private function on_start(){
-        
+    public function on_start($serv){
+        file_put_contents($this->conf['pid_file'],$serv->master_pid);
     }
 
-    private function on_shutdown(){
-
-    }
-
-    private function on_connect(){
+    public function on_shutdown(){
 
     }
 
-    private function on_receive(){
+    public function on_connect(){
 
     }
 
-    private function on_close(){
+    public function on_receive(){
 
     }
 
-    private function on_task(){
+    public function on_close(){
 
     }
 
-    private function on_finish(){
+    public function on_task(){
+
+    }
+
+    public function on_finish(){
 
     }
 
