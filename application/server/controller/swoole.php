@@ -4,19 +4,20 @@
  */
 namespace app\server\controller;
 use think\Config;
+use think\Log;
 class swoole{
 
     public $serv;
     public $conf;
     public function __construct()
     {
-        //$this->check_run();
-        //$this->check_params();
+        $this->conf = Config::get('swoole_set');
+        $this->check_run();
+        $this->check_params();
     }
 
     public function index(){
         $this->serv = new \swoole_server("127.0.0.1", 9501);
-        $this->conf = Config::get('swoole_set');
         $this->serv->set($this->conf);
         $this->serv->on("Start",array($this,'on_start'));           //swoole启动主进程主线程回调
         $this->serv->on("Shutdown",array($this,'on_shutdown'));     //服务关闭回调
@@ -29,7 +30,10 @@ class swoole{
     }
 
     public function on_start($serv){
-        file_put_contents($this->conf['pid_file'],$serv->master_pid);
+        file_put_contents($this->conf['master_pid'],$serv->master_pid);
+        file_put_contents($this->conf['manager_pid'],$serv->manager_pid);
+        Log::write("Swoole服务启动成功!");
+
     }
 
     public function on_shutdown(){
@@ -70,12 +74,16 @@ class swoole{
      */
     private function check_params(){
         $params = input('s');
+        $master_pid = file_get_contents($this->conf['master_pid']);
         switch($params){
             case "reload":
-                exec("kill -USR1 ");
+                exec("kill -USR1 $master_pid");
+                Log::write("Swoole Reload 完成!");
                 exit;
                 break;
             case "shutdown":
+                exec("kill -15 $master_pid");
+                Log::write("Swoole Shutdown 完成!");
                 exit;
                 break;
         }
