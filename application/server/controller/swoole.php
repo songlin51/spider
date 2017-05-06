@@ -37,10 +37,10 @@ class swoole{
     }
 
     public function on_shutdown(){
-
+        Log::write("Swoole关闭成功!");
     }
 
-    public function on_connect(){
+    public function on_connect($server, $fd, $from_id){
 
     }
 
@@ -74,18 +74,20 @@ class swoole{
      */
     private function check_params(){
         $params = input('s');
-        $master_pid = file_get_contents($this->conf['master_pid']);
-        switch($params){
-            case "reload":
-                exec("kill -USR1 $master_pid");
-                Log::write("Swoole Reload 完成!");
-                exit;
-                break;
-            case "shutdown":
-                exec("kill -15 $master_pid");
-                Log::write("Swoole Shutdown 完成!");
-                exit;
-                break;
+        if($params){
+            $master_pid = file_get_contents($this->conf['master_pid']);
+            switch($params){
+                case "reload":
+                    exec("kill -USR1 $master_pid");
+                    Log::write("Swoole Reload 完成!");
+                    exit;
+                    break;
+                case "shutdown":
+                    exec("kill -15 $master_pid");
+                    Log::write("Swoole Shutdown 完成!");
+                    exit;
+                    break;
+            }
         }
     }
 
