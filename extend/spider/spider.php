@@ -1,6 +1,8 @@
 <?php
 namespace spider;
 use Curl\Curl;
+use think\Log;
+
 class spider{
     public $config      = [];
     public $curl;
@@ -39,9 +41,21 @@ class spider{
     private function getHttp(){
         $url = $this->queueLeftPop();
         if($url){
-           $result = $this->curl->get($url);
-           var_dump($result);
+            $result = $this->curl->get($url);
+            if(!$this->curl->error){
+                $this->analysisContent($result);
+            }else{
+                Log::write("抓取失败");
+            }
         }
+    }
+
+
+    /**
+     * 解析内容加入队列
+     */
+    private function analysisContent($text = ''){
+
     }
 
     /**
