@@ -9,6 +9,10 @@ class Index
     {
             $this->config      = [
             "webSite"       =>'http://www.mmjpg.com',
+            "domains"       =>[
+                "www.mmjpg.com",
+                "mmjpg.com"
+            ],
             "wenName"       =>'妹子图',
             "indexUrl"      =>'http://www.mmjpg.com',
             "listUrl"       =>[
