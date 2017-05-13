@@ -5,12 +5,12 @@ use think\Log;
 
 class spider{
     public $config          = [];
-    public $curl;
-    public $queueList       = [];       //队列数组,swoole看情况需要一个文件队列或者Redis
+    public $fields          = [];   //入库字段
+    public $queueList       = [];   //队列数组,swoole看情况需要一个文件队列或者Redis
     public $queueListKey    = [];
     public $loadImagesFunc;         //图片回调方法
     public $contentFunc;            //内容回调
-    public $titleFunc;              //标题回调
+    public $listFunc;               //列表回调
 
     public function __construct($config)
     {
@@ -20,6 +20,9 @@ class spider{
         $this->config['listUrl']        = !empty($config['listUrl'])?$config['listUrl']:'';
         $this->config['contentUrl']     = !empty($config['contentUrl'])?$config['contentUrl']:'';
         $this->config['domains']        = !empty($config['domains'])?$config['domains']:[];
+        $this->config['fields']         = !empty($config['fields'])?$config['fields']:[];
+        $this->config['explodeType']    = !empty($config['explode']['type'])?$config['explode']['type']:'Mysql';
+        $this->config['tableName']      = !empty($config['explode']['tableName'])?$config['explode']['tableName']:'';
 
         if($this->config['indexUrl'])
             $this->addScanUrl($this->config['indexUrl']);
@@ -30,7 +33,7 @@ class spider{
     /**
      * 任务执行
      */
-    public function run(){
+    public function start(){
         do{
             $this->getHttp();
         }while($this->queueCount() > 0);
@@ -42,10 +45,10 @@ class spider{
      */
     private function getHttp(){
         $collect_url = $this->queueLeftPop();
-        if($collect_url){
-            $html = $this->curl->get($collect_url);
+        if(isset($collect_url['url'])){
+            $html = $this->curl->get($collect_url['url']);
             if(!$this->curl->error){
-                $this->analysisContent($html,$collect_url);
+                $this->analysisContent($html,$collect_url['url']);
             }else{
                 Log::write("抓取失败");
             }
@@ -57,25 +60,56 @@ class spider{
      * 解析内容加入队列
      */
     private function analysisContent($html = '',$collect_url){
-        if($this->config['listUrl']){
-            preg_match_all("/<a.*href=[\"']{0,1}(.*)[\"']{0,1}[> \r\n\t]{1,}/isU", $html, $urls);
-            if($urls[1]){
-                foreach ($urls[1] as $key=>$url)
-                {
-                    $urls[$key] = str_replace(array("\"", "'",'&amp;'), array("",'','&'), $url);
+        //解析url加入队列
+        preg_match_all("/<a.*href=[\"']{0,1}(.*)[\"']{0,1}[> \r\n\t]{1,}/isU", $html, $urls);
+        if($urls[1]){
+            foreach ($urls[1] as $key=>$url)
+            {
+                $urls[$key] = str_replace(array("\"", "'",'&amp;'), array("",'','&'), $url);
+            }
+            $urls = array_unique($urls);
+            foreach($urls as $key=>$v){
+                $val = $this->fillUrl($v,$collect_url);
+                if($val){
+                    $urls[$key] = $val;
+                }else{
+                    unset($urls[$key]);
                 }
-                $urls = array_unique($urls);
-                foreach($urls as $key=>$v){
-                    $val = $this->fillUrl($v,$collect_url);
-                    if($val){
-                        $urls[$key] = $val;
-                    }else{
-                        unset($urls[$key]);
-                    }
+            }
+
+            if(isset($urls)){
+                foreach($urls as $url){
+                    $this->addScanUrl($url);
                 }
-                var_dump($urls);die;
             }
         }
+
+        //列表页回调
+        if($this->isListPage($collect_url)){
+            if(!empty($this->listFunc)){
+                $html = call_user_func($this->listFunc,$html,$collect_url);
+            }
+        }
+
+        if($this->isContentPage($collect_url)){
+            //内容url回调
+            if(!empty($this->contentFunc)){
+                $html = call_user_func($this->contentFunc,$html,$collect_url);
+            }
+            //字段筛选
+            if(isset($this->config['fields'])){
+                foreach($this->config['fields'] as $key=>$fields){
+                    if(!empty($fields)){
+                        preg_match("#$fields[rule]#",$html,$fieldValue);
+                        if(!empty($fieldValue[1])){
+                            $data[$fields['fieldName']] = $fieldValue[1];
+                        }
+                    }
+                }
+                var_dump($data);die;
+            }
+        }
+
     }
 
     /**
@@ -101,7 +135,7 @@ class spider{
         $key = md5($arr['url']);
         if(!array_key_exists($key,$this->queueListKey)){
             $this->queueListKey[$key] = time();
-            $result = array_unshift($this->queueList,$arr['url']);
+            $result = array_unshift($this->queueList,$arr);
         }
         return $result;
     }
