@@ -3,16 +3,21 @@ namespace spider;
 use Curl\Curl;
 use think\Log;
 use export;
+use spiderlog;
 
 class spider{
     public $config          = [];
+    public $log;
     public $fields          = [];   //入库字段
     public $queueList       = [];   //队列数组,swoole看情况需要一个文件队列或者Redis
     public $queueListKey    = [];
+    public $queueListCount  = 0;    //队列长度
     public $loadImagesFunc;         //图片回调方法
     public $contentFunc;            //内容回调
     public $listFunc;               //列表回调
     public $fieldsFunc;             //字段内容回调
+
+    public $startTime = 0;          //爬虫开始时间
 
     public function __construct($config)
     {
@@ -36,7 +41,13 @@ class spider{
      * 任务执行
      */
     public function start(){
+        //实例化日志
+        $this->log = new spiderlog\log($this);
+        //初始化爬取时间
+        $this->startTime = date("Y-m-d H:i:s",time());
+
         do{
+            $this->log->startLog();
             $this->getHttp();
         }while($this->queueCount() > 0);
     }
@@ -111,7 +122,7 @@ class spider{
                         $export = new export\mysql($this->config['tableName']);
                         break;
                     case 'csv':
-                        $export = new export\csv();
+                        $export = new export\csv($this->config['tableName']);
                         break;
                     default:
                         break;
@@ -145,6 +156,7 @@ class spider{
         $result = false;
         $key = md5($arr['url']);
         if(!array_key_exists($key,$this->queueListKey)){
+            $this->queueListCount++;
             $this->queueListKey[$key] = time();
             $result = array_unshift($this->queueList,$arr);
         }
@@ -158,6 +170,7 @@ class spider{
         $result = false;
         $key = md5($arr['url']);
         if(!array_key_exists($key,$this->queueListKey)){
+            $this->queueListCount++;
             $this->queueListKey[$key] = time();
             $result = array_push($this->queueList,$arr);
         }
