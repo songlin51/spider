@@ -2,6 +2,7 @@
 namespace spider;
 use Curl\Curl;
 use think\Log;
+use export;
 
 class spider{
     public $config          = [];
@@ -11,6 +12,7 @@ class spider{
     public $loadImagesFunc;         //图片回调方法
     public $contentFunc;            //内容回调
     public $listFunc;               //列表回调
+    public $fieldsFunc;             //字段内容回调
 
     public function __construct($config)
     {
@@ -97,16 +99,25 @@ class spider{
                 $html = call_user_func($this->contentFunc,$html,$collect_url);
             }
             //字段筛选
-            if(isset($this->config['fields'])){
-                foreach($this->config['fields'] as $key=>$fields){
-                    if(!empty($fields)){
-                        preg_match("#$fields[rule]#",$html,$fieldValue);
-                        if(!empty($fieldValue[1])){
-                            $data[$fields['fieldName']] = $fieldValue[1];
-                        }
-                    }
+            $data = $this->getFields($html,$collect_url);
+            if(isset($this->fieldsFunc) && !empty($data)){
+                $data = call_user_func($this->fieldsFunc,$data);
+            }
+
+            if(!empty($data)){
+                $export = '';
+                switch($this->config['explodeType']){
+                    case 'Mysql':
+                        $export = new export\mysql($this->config['tableName']);
+                        break;
+                    case 'csv':
+                        $export = new export\csv();
+                        break;
+                    default:
+                        break;
                 }
-                var_dump($data);die;
+                //数据落地
+                $export->addRow($data);
             }
         }
 
@@ -328,5 +339,23 @@ class spider{
         }
 
         return $url;
+    }
+
+    /**
+     * 获取字段
+     */
+    private function getFields($html,$collect_url){
+        $data = [];
+        if(isset($this->config['fields'])){
+            foreach($this->config['fields'] as $key=>$fields){
+                if(!empty($fields)){
+                    preg_match("#$fields[rule]#",$html,$fieldValue);
+                    if(!empty($fieldValue[1])){
+                        $data[$fields['fieldName']] = $fieldValue[1];
+                    }
+                }
+            }
+        }
+        return $data;
     }
 }
