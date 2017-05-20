@@ -16,7 +16,7 @@ class log{
         $startTime = time() - strtotime($this->spider->startTime);
         $msg = "\r\n-------------------------------------------------\r\n";
         $msg.="启动时间:".$this->spider->startTime.",爬取网站:".$this->spider->config['webName']."\r\n";
-        $msg.="抓取时长".$startTime."秒,队列长度:".$this->spider->queueListCount."\r\n";
+        $msg.="抓取时长".$startTime."秒,队列长度:".$this->spider->queueCount()."\r\n";
         $msg.="\r\n-------------------------------------------------\r\n";
         $this->replace_echo($msg);
     }

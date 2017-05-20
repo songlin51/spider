@@ -1,13 +1,18 @@
 <?php
 namespace spider;
 use Curl\Curl;
+use redis\redis;
 use think\Log;
 use export;
 use spiderlog;
 
 class spider{
+    const   VERSION             =   '1.0.0';
+    const   REDISLIST           =   'queueList';
+    const   REDISKEY            =   'queueListKey';
     public $config          = [];
     public $log;
+    public $redis;
     public $fields          = [];   //入库字段
     public $queueList       = [];   //队列数组,swoole看情况需要一个文件队列或者Redis
     public $queueListKey    = [];
@@ -23,6 +28,8 @@ class spider{
     {
         $this->config['webSite']        = !empty($config['webSite'])?$config['webSite']:'';
         $this->config['webName']        = !empty($config['webName'])?$config['webName']:'看妹子';
+        $this->config['workerNum']      = !empty($config['workerNum'])?$config['workerNum']:1;
+        $this->config['memory']         = !empty($config['memory'])?$config['memory']:0;        //记忆功能、0不启用、1启用
         $this->config['indexUrl']       = !empty($config['indexUrl'])?$config['indexUrl']:'';
         $this->config['listUrl']        = !empty($config['listUrl'])?$config['listUrl']:'';
         $this->config['contentUrl']     = !empty($config['contentUrl'])?$config['contentUrl']:'';
@@ -31,9 +38,7 @@ class spider{
         $this->config['explodeType']    = !empty($config['explode']['type'])?$config['explode']['type']:'Mysql';
         $this->config['tableName']      = !empty($config['explode']['tableName'])?$config['explode']['tableName']:'';
 
-        if($this->config['indexUrl'])
-            $this->addScanUrl($this->config['indexUrl']);
-
+        $this->config['isRedis']        = $this->config['memory'] =1 || $this->config['workerNum'] > 1?1:0;
         $this->curl = new Curl();
     }
 
@@ -43,8 +48,21 @@ class spider{
     public function start(){
         //实例化日志
         $this->log = new spiderlog\log($this);
+        if(isset($this->config['memory']) || $this->config['workerNum'] > 1){
+            if(!extension_loaded('redis')){
+                exit("记忆功或多进程需要开启Redis扩展");
+            }
+            //实例化redis
+            $this->redis = redis::getInstance();
+            $this->redis->conn();
+        }
+
         //初始化爬取时间
         $this->startTime = date("Y-m-d H:i:s",time());
+
+        //入口url入列
+        if($this->config['indexUrl'])
+            $this->addScanUrl($this->config['indexUrl']);
 
         do{
             $this->log->startLog();
@@ -146,6 +164,7 @@ class spider{
         }else{
             $link['url_type'] = 'index_url';
         }
+
         $this->queueLeftPush($link);
     }
 
@@ -155,10 +174,17 @@ class spider{
     private function queueLeftPush($arr = []){
         $result = false;
         $key = md5($arr['url']);
-        if(!array_key_exists($key,$this->queueListKey)){
-            $this->queueListCount++;
-            $this->queueListKey[$key] = time();
-            $result = array_unshift($this->queueList,$arr);
+        if(isset($this->config['isRedis'])){
+            if(!$this->redis->sisMember(self::REDISKEY,$key)){
+                $this->redis->sAdd(self::REDISKEY,$key);
+                $result = $this->redis->lPush(self::REDISLIST,$arr);
+            }
+        }else{
+            if(!array_key_exists($key,$this->queueListKey)){
+                $this->queueListCount++;
+                $this->queueListKey[$key] = time();
+                $result = array_unshift($this->queueList,$arr);
+            }
         }
         return $result;
     }
@@ -181,7 +207,11 @@ class spider{
      * 链接头部弹出队列
      */
     private function queueLeftPop(){
-        return array_shift($this->queueList);
+        if(isset($this->config['isRedis'])){
+            return $this->redis->lPop(self::REDISLIST);
+        }else{
+            return array_shift($this->queueList);
+        }
     }
 
     /**
@@ -191,8 +221,12 @@ class spider{
         return array_pop($this->queueList);
     }
 
-    private function queueCount(){
-        return count($this->queueList);
+    public function queueCount(){
+        if(isset($this->config['isRedis'])){
+            return $this->redis->listLen(self::REDISLIST);
+        }else{
+            return count($this->queueList);
+        }
     }
 
     /**

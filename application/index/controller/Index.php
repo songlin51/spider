@@ -9,6 +9,8 @@ class Index
     {
             $this->config      = [
                 "webSite"       =>'http://www.mmjpg.com',
+                "workerNum"     =>2,
+                "memory"        =>1,
                 "domains"       =>[
                     "www.mmjpg.com",
                     "mmjpg.com"
