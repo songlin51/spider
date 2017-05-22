@@ -63,7 +63,10 @@ class spider{
         //入口url入列
         if($this->config['indexUrl'])
             $this->addScanUrl($this->config['indexUrl']);
+        $this->run();
+    }
 
+    private function run(){
         do{
             $this->log->startLog();
             $this->getHttp();

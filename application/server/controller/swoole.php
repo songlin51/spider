@@ -17,7 +17,7 @@ class swoole{
     }
 
     public function index(){
-        $this->serv = new \swoole_server("127.0.0.1", 9501);
+        $this->serv = new \swoole_server(Config::get("swoole.host"),Config::get("swoole.port"));
         $this->serv->set($this->conf);
         $this->serv->on("Start",array($this,'on_start'));           //swoole启动主进程主线程回调
         $this->serv->on("Shutdown",array($this,'on_shutdown'));     //服务关闭回调
@@ -29,6 +29,9 @@ class swoole{
         $this->serv->start();
     }
 
+    /**
+     * 服务启动
+     */
     public function on_start($serv){
         file_put_contents($this->conf['master_pid'],$serv->master_pid);
         file_put_contents($this->conf['manager_pid'],$serv->manager_pid);
@@ -36,27 +39,39 @@ class swoole{
 
     }
 
+    /**
+     * 服务关闭
+     */
     public function on_shutdown(){
         Log::write("Swoole关闭成功!");
     }
 
+    /**
+     * 客户端连接
+     */
     public function on_connect($server, $fd, $from_id){
+        Log::write("Swoole客户端连接成功fd:$fd,from_id:$from_id");
+    }
+
+    /**
+     * 接收数据
+     */
+    public function on_receive($serv, $fd, $from_id, $data){
+        
+    }
+
+    /**
+     * 客户端关闭
+     */
+    public function on_close($serv, $fd, $reactorId){
+        Log::write("客户端 $fd 关闭成功");
+    }
+
+    public function on_task($serv, $task_id, $src_worker_id, $data){
 
     }
 
-    public function on_receive(){
-
-    }
-
-    public function on_close(){
-
-    }
-
-    public function on_task(){
-
-    }
-
-    public function on_finish(){
+    public function on_finish($serv, $task_id, $data){
 
     }
 

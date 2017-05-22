@@ -236,4 +236,10 @@ return [
         'var_page'  => 'page',
         'list_rows' => 15,
     ],
+
+    //swoole全局配置
+    'swoole'=>array(
+        'host'=>'127.0.0.1',
+        'port'=>9501
+    )
 ];
