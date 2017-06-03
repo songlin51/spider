@@ -1,15 +1,16 @@
 <?php
 namespace app\index\controller;
 use spider\spider;
+use think\Log;
 
 class Index
 {
     public $config = [];
-    public function index()
+    public function index($workerNum = 1)
     {
             $this->config      = [
                 "webSite"       =>'http://www.mmjpg.com',
-                "workerNum"     =>2,
+                "workerNum"     =>isset($workerNum)?$workerNum:1,
                 "memory"        =>1,
                 "domains"       =>[
                     "www.mmjpg.com",

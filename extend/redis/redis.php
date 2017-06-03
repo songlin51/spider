@@ -105,6 +105,13 @@ class redis{
     }
 
     /**
+     * 移除集合元素
+     */
+    public function srem($key,$str){
+        return self::$redis->SREM($key,$str);
+    }
+
+    /**
      * 队列长度
      */
     public function listLen($key){

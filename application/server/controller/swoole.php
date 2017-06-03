@@ -57,7 +57,13 @@ class swoole{
      * 接收数据
      */
     public function on_receive($serv, $fd, $from_id, $data){
-        
+        Log::write("接收客户端fd:".$fd."from_id".$from_id);
+        $params = json_decode($data,true);
+        if($params['workerNum']){
+            for($i=0;$i<$params['workerNum'];$i++){
+                $serv->task($data);
+            }
+        }
     }
 
     /**
@@ -68,6 +74,14 @@ class swoole{
     }
 
     public function on_task($serv, $task_id, $src_worker_id, $data){
+        Log::write("task任务接收_task_id:".$task_id."_data:".$data);
+        $params     = json_decode($data,true);
+        $group      = $params['group'];
+        $controller = $params['controller'];
+        $action     = $params['action'];
+        $workerNum  = $params['workerNum'];
+        $event      = controller("$group/$controller");
+        $event->$action($workerNum);
 
     }
 

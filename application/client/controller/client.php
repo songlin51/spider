@@ -21,6 +21,7 @@ class client{
             'group'=>input('param.group','index'),
             'controller'=>input('param.controller','index'),
             'action'=>input('param.action','index'),
+            'workerNum'=>input('param.workernum',1)
 
         );
         $params = json_encode($params);
