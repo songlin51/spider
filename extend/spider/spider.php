@@ -16,6 +16,7 @@ class spider{
     public $fields          = [];   //入库字段
     public $queueList       = [];   //队列数组,swoole看情况需要一个文件队列或者Redis
     public $queueListKey    = [];
+    public $thisUrlFunc;            //当前url回调
     public $queueListCount  = 0;    //队列长度
     public $loadImagesFunc;         //图片回调方法
     public $contentFunc;            //内容回调
@@ -29,7 +30,7 @@ class spider{
         $this->config['webSite']        = !empty($config['webSite'])?$config['webSite']:'';
         $this->config['webName']        = !empty($config['webName'])?$config['webName']:'看妹子';
         $this->config['workerNum']      = !empty($config['workerNum'])?$config['workerNum']:1;
-        $this->config['memory']         = !empty($config['memory'])?$config['memory']:0;        //记忆功能、0不启用、1启用
+        $this->config['memory']         = !empty($config['memory'])?true:false;        //记忆功能、false不启用、true启用
         $this->config['indexUrl']       = !empty($config['indexUrl'])?$config['indexUrl']:'';
         $this->config['listUrl']        = !empty($config['listUrl'])?$config['listUrl']:'';
         $this->config['contentUrl']     = !empty($config['contentUrl'])?$config['contentUrl']:'';
@@ -37,8 +38,6 @@ class spider{
         $this->config['fields']         = !empty($config['fields'])?$config['fields']:[];
         $this->config['explodeType']    = !empty($config['explode']['type'])?$config['explode']['type']:'Mysql';
         $this->config['tableName']      = !empty($config['explode']['tableName'])?$config['explode']['tableName']:'';
-
-        $this->config['isRedis']        = $this->config['memory'] =1 || $this->config['workerNum'] > 1?1:0;
         $this->curl = new Curl();
     }
 
@@ -48,7 +47,7 @@ class spider{
     public function start(){
         //实例化日志
         $this->log = new spiderlog\log($this);
-        if(isset($this->config['memory']) || $this->config['workerNum'] > 1){
+        if($this->config['memory'] || $this->config['workerNum'] > 1){
             if(!extension_loaded('redis')){
                 exit("记忆功或多进程需要开启Redis扩展");
             }
@@ -62,7 +61,7 @@ class spider{
 
         //入口url入列
         if($this->config['indexUrl'])
-            $this->addScanUrl($this->config['indexUrl']);
+            $this->addScanUrl($this->config['indexUrl'],true);
         $this->run();
     }
 
@@ -80,6 +79,9 @@ class spider{
     private function getHttp(){
         $collect_url = $this->queueLeftPop();
         if(isset($collect_url['url'])){
+            if(!empty($this->thisUrlFunc)){
+                call_user_func($this->thisUrlFunc,$collect_url);
+            }
             $html = $this->curl->get($collect_url['url']);
             if(!$this->curl->error){
                 $this->analysisContent($html,$collect_url['url']);
@@ -117,7 +119,6 @@ class spider{
                 }
             }
         }
-
         //列表页回调
         if($this->isListPage($collect_url)){
             if(!empty($this->listFunc)){
@@ -158,16 +159,19 @@ class spider{
     /**
      * 投递url
      */
-    private function addScanUrl($url){
+    private function addScanUrl($url,$isIndex=false){
         $link['url'] = $url;
-        if($this->isListPage($url)){
-            $link['url_type'] = 'list_url';
-        }elseif($this->isContentPage($url)){
-            $link['url_type'] = 'content_url';
-        }else{
+        if($isIndex){
             $link['url_type'] = 'index_url';
+        }else{
+            if($this->isListPage($url)){
+                $link['url_type'] = 'list_url';
+            }elseif($this->isContentPage($url)){
+                $link['url_type'] = 'content_url';
+            }else{
+                return false;
+            }
         }
-
         $this->queueLeftPush($link);
     }
 
@@ -177,7 +181,7 @@ class spider{
     private function queueLeftPush($arr = []){
         $result = false;
         $key = md5($arr['url']);
-        if(isset($this->config['isRedis'])){
+        if($this->config['memory']){
             if(!$this->redis->sisMember(self::REDISKEY,$key)){
                 $this->redis->sAdd(self::REDISKEY,$key);
                 $result = $this->redis->lPush(self::REDISLIST,$arr);
@@ -210,7 +214,7 @@ class spider{
      * 链接头部弹出队列
      */
     private function queueLeftPop(){
-        if(isset($this->config['isRedis'])){
+        if($this->config['memory']){
             return $this->redis->lPop(self::REDISLIST);
         }else{
             return array_shift($this->queueList);
@@ -225,7 +229,7 @@ class spider{
     }
 
     public function queueCount(){
-        if(isset($this->config['isRedis'])){
+        if($this->config['memory']){
             return $this->redis->listLen(self::REDISLIST);
         }else{
             return count($this->queueList);
@@ -399,7 +403,8 @@ class spider{
         if(isset($this->config['fields'])){
             foreach($this->config['fields'] as $key=>$fields){
                 if(!empty($fields)){
-                    preg_match("#$fields[rule]#",$html,$fieldValue);
+                    $mode = !empty($fields["mode"])?"#".$fields["mode"]:'#';
+                    preg_match("#$fields[rule]$mode",$html,$fieldValue);
                     if(!empty($fieldValue[1])){
                         $data[$fields['fieldName']] = $fieldValue[1];
                     }
