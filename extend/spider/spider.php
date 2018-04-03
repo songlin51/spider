@@ -28,12 +28,12 @@ class spider{
     public function __construct($config)
     {
         $this->config['webSite']        = !empty($config['webSite'])?$config['webSite']:'';
-        $this->config['webName']        = !empty($config['webName'])?$config['webName']:'看妹子';
+        $this->config['webName']        = !empty($config['webName'])?$config['webName']:'Default';
         $this->config['workerNum']      = !empty($config['workerNum'])?$config['workerNum']:1;
         $this->config['memory']         = !empty($config['memory'])?true:false;        //记忆功能、false不启用、true启用
         $this->config['indexUrl']       = !empty($config['indexUrl'])?$config['indexUrl']:'';
-        $this->config['listUrl']        = !empty($config['listUrl'])?$config['listUrl']:'';
-        $this->config['contentUrl']     = !empty($config['contentUrl'])?$config['contentUrl']:'';
+        $this->config['listUrl']        = !empty($config['listUrl'])?$config['listUrl']:[];
+        $this->config['contentUrl']     = !empty($config['contentUrl'])?$config['contentUrl']:[];
         $this->config['domains']        = !empty($config['domains'])?$config['domains']:[];
         $this->config['fields']         = !empty($config['fields'])?$config['fields']:[];
         $this->config['explodeType']    = !empty($config['explode']['type'])?$config['explode']['type']:'Mysql';
@@ -97,28 +97,31 @@ class spider{
      */
     private function analysisContent($html = '',$collect_url){
         //解析url加入队列
-        preg_match_all("/<a.*href=[\"']{0,1}(.*)[\"']{0,1}[> \r\n\t]{1,}/isU", $html, $urls);
-        if($urls[1]){
-            foreach ($urls[1] as $key=>$url)
-            {
-                $urls[$key] = str_replace(array("\"", "'",'&amp;'), array("",'','&'), $url);
-            }
-            $urls = array_unique($urls);
-            foreach($urls as $key=>$v){
-                $val = $this->fillUrl($v,$collect_url);
-                if($val){
-                    $urls[$key] = $val;
-                }else{
-                    unset($urls[$key]);
+        if(is_string($html)){
+            preg_match_all("/<a.*href=[\"']{0,1}(.*)[\"']{0,1}[> \r\n\t]{1,}/isU", $html, $urls);
+            if($urls[1]){
+                foreach ($urls[1] as $key=>$url)
+                {
+                    $urls[$key] = str_replace(array("\"", "'",'&amp;'), array("",'','&'), $url);
                 }
-            }
+                $urls = array_unique($urls);
+                foreach($urls as $key=>$v){
+                    $val = $this->fillUrl($v,$collect_url);
+                    if($val){
+                        $urls[$key] = $val;
+                    }else{
+                        unset($urls[$key]);
+                    }
+                }
 
-            if(isset($urls)){
-                foreach($urls as $url){
-                    $this->addScanUrl($url);
+                if(isset($urls)){
+                    foreach($urls as $url){
+                        $this->addScanUrl($url);
+                    }
                 }
             }
         }
+
         //列表页回调
         if($this->isListPage($collect_url)){
             if(!empty($this->listFunc)){
@@ -158,8 +161,10 @@ class spider{
 
     /**
      * 投递url
+     * @param $url  投递url
+     * @param $isIndex 是否为入口url
      */
-    private function addScanUrl($url,$isIndex=false){
+    public function addScanUrl($url,$isIndex=false){
         $link['url'] = $url;
         if($isIndex){
             $link['url_type'] = 'index_url';
